@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blender Visual Coder</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            gap: 0;
+        }
+
+        /* Canvas area */
+        .canvas-wrapper {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+            overflow: hidden;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: inherit;
+            cursor: grab;
+        }
+
+        #canvas:active {
+            cursor: grabbing;
+        }
+
+        .nodes-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* Node styling */
+        .node {
+            position: absolute;
+            background: linear-gradient(135deg, #2a2a3a 0%, #1f1f2f 100%);
+            border: 2px solid #4a4a5a;
+            border-radius: 8px;
+            padding: 0;
+            min-width: 180px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            cursor: move;
+            z-index: 100;
+            user-select: none;
+        }
+
+        .node:hover {
+            border-color: #6a6a7a;
+            box-shadow: 0 6px 16px rgba(0, 255, 136, 0.2);
+        }
+
+        .node.selected {
+            border-color: #00ff88;
+            box-shadow: 0 6px 16px rgba(0, 255, 136, 0.4);
+        }
+
+        .node-title {
+            background: linear-gradient(90deg, #3a4a5a 0%, #2a3a4a 100%);
+            padding: 10px 12px;
+            border-bottom: 1px solid #4a4a5a;
+            font-weight: bold;
+            font-size: 13px;
+            color: #00ff88;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .node-content {
+            padding: 12px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .node-inputs,
+        .node-outputs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .socket {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .socket.input {
+            flex-direction: row;
+        }
+
+        .socket.output {
+            flex-direction: row-reverse;
+        }
+
+        .socket-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;;
+            background: #ffffff;
+            border: 2px solid #4a4a5a;
+            cursor: crosshair;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .socket-dot:hover {
+            width: 16px;
+            height: 16px;
+            background: #00ff88;
+            border-color: #00ff88;
+            box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+        }
+
+        .socket-dot.connected {
+            background: #00ff88;
+            border-color: #00ff88;
+            box-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+        }
+
+        /* Control panel */
+        .control-panel {
+            width: 320px;
+            background: #1a1a1a;
+            border-left: 1px solid #333;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .control-section {
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+        }
+
+        .control-section:last-child {
+            border-bottom: none;
+        }
+
+        .control-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .slider-group label {
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            height: 6px;
+            border-radius: 3px;
+            background: #333;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00ff88;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00ff88;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 40px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .slider-value {
+            text-align: center;
+            font-size: 12px;
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        button {
+            padding: 10px 12px;
+            background: #00ff88;
+            color: #0a0a0a;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-size: 12px;
+        }
+
+        button:hover {
+            background: #00dd77;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .secondary-btn {
+            background: #333;
+            color: #e0e0e0;
+        }
+
+        .secondary-btn:hover {
+            background: #444;
+            box-shadow: 0 4px 12px rgba(100, 100, 100, 0.2);
+        }
+
+        .node-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .node-buttons button {
+            padding: 8px;
+            font-size: 11px;
+        }
+
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .preset-btn {
+            padding: 8px;
+            font-size: 11px;
+        }
+
+        .console-output {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #00ff88;
+            height: 150px;
+            overflow-y: auto;
+            line-height: 1.4;
+        }
+
+        .console-line {
+            margin: 2px 0;
+            word-break: break-all;
+        }
+
+        .console-error {
+            color: #ff6b6b;
+        }
+
+        .console-warn {
+            color: #ffd93d;
+        }
+
+        .run-btn {
+            background: #00ff88;
+            width: 100%;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 1024px) {
+            .control-panel {
+                width: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="editor-wrapper">
+            <textarea id="editor" placeholder="// Start coding with blinders on...&#10;console.log('Focus on what matters');"></textarea>
+            <div class="editor-blinder left"></div>
+            <div class="editor-blinder right"></div>
+            <div class="editor-blinder top"></div>
+            <div class="editor-blinder bottom"></div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-section">
+                <div class="control-label">Blinder Settings</div>
+                <div class="slider-group">
+                    <label>Left Blinder Width</label>
+                    <input type="range" id="leftBlinderWidth" min="0" max="40" value="15">
+                    <div class="slider-value" id="leftValue">15%</div>
+                </div>
+                <div class="slider-group">
+                    <label>Right Blinder Width</label>
+                    <input type="range" id="rightBlinderWidth" min="0" max="40" value="15">
+                    <div class="slider-value" id="rightValue">15%</div>
+                </div>
+                <div class="slider-group">
+                    <label>Top/Bottom Height</label>
+                    <input type="range" id="verticalBlinderHeight" min="0" max="30" value="10">
+                    <div class="slider-value" id="verticalValue">10%</div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="control-label">Theme</div>
+                <div class="slider-group">
+                    <label>Text Color</label>
+                    <input type="color" id="textColor" value="#00ff88">
+                </div>
+                <div class="slider-group">
+                    <label>Background Color</label>
+                    <input type="color" id="bgColor" value="#1a1a1a">
+                </div>
+                <div class="slider-group">
+                    <label>Font Size</label>
+                    <input type="range" id="fontSize" min="10" max="24" value="16">
+                    <div class="slider-value" id="fontSizeValue">16px</div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="control-label">Presets</div>
+                <div class="preset-buttons">
+                    <button class="preset-btn" onclick="applyPreset('extreme')">Extreme Focus</button>
+                    <button class="preset-btn" onclick="applyPreset('minimal')">Minimal Blinders</button>
+                    <button class="preset-btn" onclick="applyPreset('tunnel')">Tunnel Vision</button>
+                    <button class="preset-btn" onclick="applyPreset('dark')">Dark Mode</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="control-label">Stats</div>
+                <div class="stats">
+                    <div class="stat-line">
+                        <span>Characters:</span>
+                        <span id="charCount">0</span>
+                    </div>
+                    <div class="stat-line">
+                        <span>Lines:</span>
+                        <span id="lineCount">1</span>
+                    </div>
+                    <div class="stat-line">
+                        <span>Words:</span>
+                        <span id="wordCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <button class="run-btn" onclick="runCode()">▶ Run Code</button>
+            </div>
+
+            <div class="control-section">
+                <div class="control-label">Console Output</div>
+                <div class="console-output" id="consoleOutput"></div>
+                <button class="secondary-btn" onclick="clearConsole()" style="margin-top: 8px; width: 100%;">Clear Console</button>
+            </div>
+
+            <div class="control-section">
+                <button onclick="clearEditor()">Clear Code</button>
+                <button class="secondary-btn" onclick="downloadCode()">Download</button>
+                <button class="secondary-btn" onclick="copyToClipboard()">Copy</button>
+            </div>
+
+            <div class="control-section">
+                <div class="control-label">Info</div>
+                <p style="font-size: 12px; color: #888;">
+                    Blinder Coder helps you focus on writing code by limiting your peripheral vision. Adjust the blinders to reduce distractions and concentrate on the task at hand.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const editor = document.getElementById('editor');
+        const leftBlinderWidth = document.getElementById('leftBlinderWidth');
+        const rightBlinderWidth = document.getElementById('rightBlinderWidth');
+        const verticalBlinderHeight = document.getElementById('verticalBlinderHeight');
+        const textColorInput = document.getElementById('textColor');
+        const bgColorInput = document.getElementById('bgColor');
+        const fontSizeInput = document.getElementById('fontSize');
+
+        // Update blinder widths
+        leftBlinderWidth.addEventListener('input', (e) => {
+            document.querySelector('.editor-blinder.left').style.width = e.target.value + '%';
+            document.getElementById('leftValue').textContent = e.target.value + '%';
+        });
+
+        rightBlinderWidth.addEventListener('input', (e) => {
+            document.querySelector('.editor-blinder.right').style.width = e.target.value + '%';
+            document.getElementById('rightValue').textContent = e.target.value + '%';
+        });
+
+        verticalBlinderHeight.addEventListener('input', (e) => {
+            document.querySelector('.editor-blinder.top').style.height = e.target.value + '%';
+            document.querySelector('.editor-blinder.bottom').style.height = e.target.value + '%';
+            document.getElementById('verticalValue').textContent = e.target.value + '%';
+        });
+
+        // Update colors and fonts
+        textColorInput.addEventListener('input', (e) => {
+            editor.style.color = e.target.value;
+        });
+
+        bgColorInput.addEventListener('input', (e) => {
+            editor.style.background = e.target.value;
+        });
+
+        fontSizeInput.addEventListener('input', (e) => {
+            editor.style.fontSize = e.target.value + 'px';
+            document.getElementById('fontSizeValue').textContent = e.target.value + 'px';
+        });
+
+        // Update stats
+        editor.addEventListener('input', updateStats);
+
+        function updateStats() {
+            const text = editor.value;
+            const chars = text.length;
+            const lines = text.split('\n').length;
+            const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+
+            document.getElementById('charCount').textContent = chars;
+            document.getElementById('lineCount').textContent = lines;
+            document.getElementById('wordCount').textContent = words;
+        }
+
+        // Presets
+        function applyPreset(preset) {
+            switch(preset) {
+                case 'extreme':
+                    leftBlinderWidth.value = 30;
+                    rightBlinderWidth.value = 30;
+                    verticalBlinderHeight.value = 20;
+                    break;
+                case 'minimal':
+                    leftBlinderWidth.value = 5;
+                    rightBlinderWidth.value = 5;
+                    verticalBlinderHeight.value = 0;
+                    break;
+                case 'tunnel':
+                    leftBlinderWidth.value = 25;
+                    rightBlinderWidth.value = 25;
+                    verticalBlinderHeight.value = 0;
+                    break;
+                case 'dark':
+                    textColorInput.value = '#ffffff';
+                    bgColorInput.value = '#000000';
+                    break;
+            }
+            // Trigger events to update UI
+            leftBlinderWidth.dispatchEvent(new Event('input'));
+            rightBlinderWidth.dispatchEvent(new Event('input'));
+            verticalBlinderHeight.dispatchEvent(new Event('input'));
+            textColorInput.dispatchEvent(new Event('input'));
+            bgColorInput.dispatchEvent(new Event('input'));
+        }
+
+        // Clear editor
+        function clearEditor() {
+            if (confirm('Clear all code?')) {
+                editor.value = '';
+                updateStats();
+            }
+        }
+
+        // Download code
+        function downloadCode() {
+            const text = editor.value;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'code.txt';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Copy to clipboard
+        function copyToClipboard() {
+            editor.select();
+            document.execCommand('copy');
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+
+        // Console capture
+        let consoleOutputDiv = document.getElementById('consoleOutput');
+        let originalLog = console.log;
+        let originalError = console.error;
+        let originalWarn = console.warn;
+
+        function addConsoleOutput(message, type = 'log') {
+            const line = document.createElement('div');
+            line.className = 'console-line';
+            if (type === 'error') line.classList.add('console-error');
+            if (type === 'warn') line.classList.add('console-warn');
+            line.textContent = message;
+            consoleOutputDiv.appendChild(line);
+            consoleOutputDiv.scrollTop = consoleOutputDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addConsoleOutput(args.map(arg => {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg, null, 2);
+                    } catch(e) {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' '), 'log');
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addConsoleOutput(args.join(' '), 'error');
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addConsoleOutput(args.join(' '), 'warn');
+        };
+
+        // Run code
+        function runCode() {
+            clearConsole();
+            const code = editor.value;
+            if (!code.trim()) {
+                addConsoleOutput('No code to run', 'warn');
+                return;
+            }
+            try {
+                addConsoleOutput('--- Running code ---', 'log');
+                eval(code);
+                addConsoleOutput('--- Execution complete ---', 'log');
+            } catch (error) {
+                addConsoleOutput(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Clear console
+        function clearConsole() {
+            consoleOutputDiv.innerHTML = '';
+        }
+
+        // Initialize
+        updateStats();
+    </script>
+</body>
+</html>
